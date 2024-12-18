@@ -3,66 +3,99 @@
 
 namespace App\Controller;
 
+use App\Entity\BlogPost;
+use DateTime;
+use Doctrine\ORM\EntityManagerInterface;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\ParamConverter;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
-// use Symfony\Component\Routing\Annotation\Route;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Routing\Annotation\Route;
+
 
 /**
  * @Route("/blog")
  */
 class BlogController extends AbstractController
 {
-    private const POSTS = [
-        [
-            'id' => 1,
-            'slug' => 'hello-world',
-            'title' => 'Hello World'
-        ],
-        [
-            'id' => 2,
-            'slug' => 'another-world',
-            'title' => 'Another World'
-        ],
-        [
-            'id' => 3,
-            'slug' => 'last-example',
-            'title' => 'Last Example'
-        ]
-    ];
+    public function __construct(
+        private EntityManagerInterface $entityManager,
+    ) {}
+    
     /**
-     * @Route("/{page}", name="blog_list", defaults={"page": 5})
+     * @Route("/list/{page}", name="blog_list")
      */
-    public function list($page = 1, Request $request): Response
+    public function list(Request $request, $page = 1): Response
     {
         $limit = $request->get('limit', 10);
+
+        /** @BlogPostReporisory $blogPostRep */
+        $blogPostRep = $this->entityManager->getRepository(BlogPost::class);
+        $posts = $blogPostRep->findAll();
+
         return $this->json([
             'page' => $page,
             'limit' => $limit,
-            'data' => array_map(function ($item) {
-                return $this->generateUrl('blog_by_slug', ['slug' => $item['slug']]);
-            }, self::POSTS)
+            'data' => array_map(function (BlogPost $post) {
+                return $this->generateUrl('blog_by_id', ['id' => $post->getId()]);
+            }, $posts)
         ]);
     }
 
     /**
-     * @Route("/post/{id}", name="blog_by_id", requirements={"id"="\d+"})
+     * @Route("/post/{id}", name="blog_by_id")
      */
     public function post($id): Response
     {
         return $this->json(
-            self::POSTS[array_search($id, array_column(self::POSTS, 'id'))]
+            $this->entityManager->getRepository(BlogPost::class)->find($id)
         );
     }
+
     /**
      * @Route("/post/{slug}", name="blog_by_slug")
      */
-    public function postBySlug($slug): Response
+    public function postBySlug($slug, EntityManagerInterface $entityManager): Response
     {
         return $this->json(
-            self::POSTS[array_search($slug, array_column(self::POSTS, 'slug'))]
+            $this->entityManager->getRepository(BlogPost::class)->findOneBy(['slug' => $slug])
         );
+    }
+
+    /**
+     * @Route("/post/add", name="post_add")
+     */
+    public function add(Request $request): Response
+    {
+        $data = json_decode($request->getContent(), true);
+
+        $blogPost = new BlogPost();
+        $blogPost->setTitle($data['title'])
+            ->setAuthor($data['author'])
+            ->setContent($data['content'])
+            ->setPublished(new DateTime($data['published']))
+            ->setSlug($data['slug']);
+
+        // Persist the entity using the EntityManager
+        $this->entityManager->persist($blogPost);
+        $this->entityManager->flush();
+
+        // Return a JSON response
+        return $this->json($blogPost);
+    }
+
+    /**
+     * @Route("/post/add/{id}", name="blog_delete")
+     */
+    public function delete($id): Response
+    {
+        $post = $this->entityManager->getRepository(BlogPost::class)->find($id);
+
+        $this->entityManager->remove($post);
+        $this->entityManager->flush();
+
+        // Return a JSON response
+        return $this->json(null, response::HTTP_NO_CONTENT);
     }
 }

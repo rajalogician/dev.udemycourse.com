@@ -1,3 +1,36 @@
-#index:
-#    path: /
-#    controller: App\Controller\DefaultController::index
+# config/routes.yaml
+blog_list:
+  path: /blog/list/{page}
+  # the controller value has the format 'controller_class::method_name'
+  controller: App\Controller\BlogController::list
+  methods: GET
+  defaults:
+    page: 1
+  requirements:
+    page: '\d+'
+
+blog_by_id:
+  path: /blog/post/{id}
+  controller: App\Controller\BlogController::post
+  methods: GET|HEAD
+  requirements:
+    id: '\d+'
+
+blog_by_slug:
+  path: /blog/post/{slug}
+  controller: App\Controller\BlogController::postBySlug
+  methods: GET|HEAD
+  requirements:
+    slug: '[a-zA-Z1-9\-_\/]+'
+
+post_add:
+  path: /blog/post/add
+  controller: App\Controller\BlogController::add
+  methods: POST
+
+blog_delete:
+  path: /blog/post/{id}
+  controller: App\Controller\BlogController::delete
+  methods: DELETE
+  requirements:
+    id: '\d+'
